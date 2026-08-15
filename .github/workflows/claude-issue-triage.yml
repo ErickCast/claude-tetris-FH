@@ -1,0 +1,123 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+# Si el issue se edita varias veces seguidas, solo corre el analisis mas reciente
+concurrency:
+  group: claude-issue-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    # No reaccionar a ediciones hechas por bots (incluido el propio Claude)
+    if: github.event.sender.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # leer game.js y demas para diagnosticar
+      issues: write # aplicar labels y comentar
+      id-token: write # requerido por claude-code-action
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Catalogo fijo de labels: Claude solo elige entre estos.
+      # `--force` hace el paso idempotente en cada ejecucion.
+      - name: Ensure labels exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ensure() { gh label create "$1" --color "$2" --description "$3" --force; }
+
+          # Tipo
+          ensure "bug"             "d73a4a" "Algo no funciona como deberia"
+          ensure "enhancement"     "a2eeef" "Funcionalidad nueva o mejora"
+          ensure "question"        "d876e3" "Duda o solicitud de informacion"
+          ensure "docs"            "0075ca" "Cambios en documentacion (README, CLAUDE.md)"
+
+          # Area del juego
+          ensure "gameplay"        "5319e7" "Reglas del juego: rotacion, colision, scoring, niveles"
+          ensure "rendering"       "1d76db" "Dibujado en canvas: grid, ghost piece, colores"
+          ensure "input"           "fbca04" "Listener de keydown, controles, pausa"
+          ensure "ui-styling"      "c2e0c6" "index.html / style.css / HUD"
+          ensure "performance"     "e99695" "Loop, requestAnimationFrame, dropInterval"
+
+          # Prioridad
+          ensure "prioridad-alta"  "b60205" "Rompe el juego o bloquea el uso"
+          ensure "prioridad-media" "fef2c0" "Molesto pero con workaround"
+          ensure "prioridad-baja"  "ededed" "Cosmetico o de bajo impacto"
+
+      - name: Run Claude issue triage
+        id: triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label list:*),Read,Glob,Grep"'
+          prompt: |
+            Eres el triage automatico de issues de este repositorio: un Tetris en JavaScript vanilla
+            (`game.js`, `index.html`, `style.css`, sin build ni tests). Lee `CLAUDE.md` antes de
+            diagnosticar: describe la arquitectura y varios gotchas conocidos.
+
+            El issue a analizar es el numero ${{ github.event.issue.number }} del repositorio
+            ${{ github.repository }}. Leelo con `gh issue view ${{ github.event.issue.number }} --json title,body,labels,comments`.
+
+            Tu trabajo tiene dos partes.
+
+            ## 1. Asignar labels
+
+            Elige labels UNICAMENTE de este catalogo (no inventes ni crees labels nuevos):
+
+            - Tipo: `bug`, `enhancement`, `question`, `docs`
+            - Area: `gameplay`, `rendering`, `input`, `ui-styling`, `performance`
+            - Prioridad: `prioridad-alta`, `prioridad-media`, `prioridad-baja`
+
+            Lo normal es 1 de tipo + 1 de area + 1 de prioridad. Puedes poner mas de un area si el
+            problema realmente cruza varias. Aplicalos con:
+            `gh issue edit ${{ github.event.issue.number }} --add-label "a,b,c"`
+
+            Si el issue ya trae labels del catalogo que siguen siendo correctos, dejalos; solo agrega
+            los que falten y quita con `--remove-label` los que el analisis contradiga.
+
+            ## 2. Publicar el diagnostico
+
+            Escribe un diagnostico tecnico en **espanol** (los identificadores de codigo se quedan en
+            ingles) con exactamente estas secciones:
+
+            - **Resumen** — el problema en 1-2 frases.
+            - **Reproduccion** — pasos concretos. Si el issue no los da, dilo explicitamente; NO los
+              inventes.
+            - **Causa probable** — archivos y funciones concretas (`game.js:collide`, `tryRotate`,
+              `lockPiece`, `loop`, `spawn`, ...) con tu hipotesis y tu nivel de confianza
+              (alta / media / baja). Lee el codigo antes de afirmar nada.
+            - **Enfoque de solucion sugerido** — que tocar y en que orden. NO escribas el codigo de la
+              solucion todavia: esto es un diagnostico, otro paso lo implementara.
+            - **Riesgos y gotchas** — apoyate en `CLAUDE.md` (el tamano del canvas hardcodeado en
+              `index.html`, el `loop` que sigue corriendo tras `endGame()`, `spawn()` que no hace
+              early-return, etc.) y en lo que veas en el codigo.
+            - **Informacion faltante** — que habria que preguntarle a quien abrio el issue.
+
+            El comentario debe EMPEZAR con esta linea exacta, que sirve de marcador:
+
+            <!-- claude-triage -->
+
+            Antes de publicar, revisa los comentarios del issue buscando uno que ya contenga ese
+            marcador:
+            - Si existe, ACTUALIZALO en vez de crear otro. Puedes usar
+              `gh issue comment ${{ github.event.issue.number }} --edit-last --body-file <archivo>`
+              si ese comentario previo es el ultimo tuyo; si no, edita ese comentario concreto via
+              `gh api --method PATCH /repos/${{ github.repository }}/issues/comments/<comment_id> -f body=@<archivo>`.
+            - Si no existe, crealo con
+              `gh issue comment ${{ github.event.issue.number }} --body-file <archivo>`.
+
+            ## Reglas
+
+            - NO modifiques el titulo ni el cuerpo del issue: volveria a disparar este workflow.
+            - NO modifiques codigo del repositorio ni abras PRs. Este workflow solo diagnostica.
+            - Si el issue es demasiado vago para diagnosticarlo, dilo con franqueza en el comentario,
+              pon `question` y lista que informacion hace falta, en vez de especular.
