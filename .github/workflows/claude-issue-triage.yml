@@ -102,6 +102,19 @@ jobs:
               early-return, etc.) y en lo que veas en el codigo.
             - **Informacion faltante** — que habria que preguntarle a quien abrio el issue.
 
+            Todo el comentario debe estar escrito en **Markdown de GitHub (GFM)**, de forma que GitHub
+            lo renderice correctamente:
+
+            - Los titulos de seccion van como encabezados (`## Resumen`, `## Reproduccion`, ...).
+            - Usa listas con `-`, listas numeradas para los pasos de reproduccion y **negritas** o
+              _cursivas_ para enfatizar.
+            - Los identificadores de codigo, nombres de archivo y rutas van en backticks (`game.js`,
+              `collide()`); los fragmentos de codigo en bloques cercados con el lenguaje indicado
+              (```js ... ```).
+            - Puedes usar tablas GFM, checklists (`- [ ]`) y `<details><summary>` para secciones largas.
+            - Escapa o encierra en backticks cualquier `<` o `>` que no sea HTML intencional, para que
+              GitHub no lo interprete como etiqueta.
+
             El comentario debe EMPEZAR con esta linea exacta, que sirve de marcador:
 
             <!-- claude-triage -->
