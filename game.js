@@ -146,6 +146,7 @@ function spawn() {
   next = randomPiece();
   if (collide(current.shape, current.x, current.y)) {
     endGame();
+    return;
   }
   drawNext();
 }
@@ -253,10 +254,19 @@ function loop(ts) {
     }
   }
   draw();
+  // lockPiece() may have ended the game in this very frame: draw the final state,
+  // then stop instead of re-scheduling a frame endGame() already cancelled.
+  if (gameOver || paused) {
+    animId = null;
+    return;
+  }
   animId = requestAnimationFrame(loop);
 }
 
 function init() {
+  // kill any pending frame before rebuilding state, so a restart never leaves two loops running
+  cancelAnimationFrame(animId);
+  animId = null;
   board = createBoard();
   score = 0;
   lines = 0;
@@ -270,7 +280,6 @@ function init() {
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
-  cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 

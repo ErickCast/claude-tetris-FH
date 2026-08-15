@@ -32,6 +32,6 @@ Input is one `keydown` listener at the bottom of `game.js`; it early-returns whe
 ## Gotchas
 
 - **Canvas size is hardcoded in `index.html`.** Changing `COLS`, `ROWS`, or `BLOCK` in `game.js` requires updating `width`/`height` on `<canvas id="board">` to `COLS*BLOCK × ROWS*BLOCK`, otherwise the board renders scaled/clipped.
-- **`endGame()` cancels the pending frame, but `loop` re-schedules itself right after** (`lockPiece` is called from inside `loop`), and `loop` never checks `gameOver`. The loop keeps ticking behind the Game Over overlay. Keep this in mind before assuming the game is halted.
-- `spawn()` calls `endGame()` on collision but still continues into `drawNext()` — it does not return early.
+- **`loop` stops itself via the `gameOver || paused` guard placed after `draw()`, not via `endGame()`'s `cancelAnimationFrame`.** `lockPiece` (and therefore `endGame`) runs from inside `loop`, so cancelling the pending frame there is useless — `loop` would re-schedule right after. The guard draws one final frame, sets `animId = null`, and returns. Any new early-exit condition belongs in that guard, and nothing after it may re-schedule unconditionally.
+- `init()` cancels the pending frame *first*, before rebuilding state, so a restart never leaves two loops running (which would double the drop speed).
 - **UI strings and README are in Spanish**; code identifiers and comments are in English. Match that split.
