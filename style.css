@@ -171,7 +171,8 @@ kbd {
   display: none;
 }
 
-.overlay-box {
+/* ---- Screens (start / pause / gameover) ---- */
+.screen {
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -179,10 +180,18 @@ kbd {
   align-items: center;
 }
 
-#overlay-title {
+.screen.hidden {
+  display: none;
+}
+
+.screen-title {
   font-size: 28px;
   font-weight: 800;
   letter-spacing: 4px;
+  color: var(--title-color);
+}
+
+#overlay-title {
   color: var(--overlay-title-color);
 }
 
@@ -192,7 +201,7 @@ kbd {
   color: var(--value-color);
 }
 
-#restart-btn {
+.menu-btn {
   margin-top: 8px;
   background: var(--restart-bg);
   color: var(--restart-text);
@@ -206,8 +215,16 @@ kbd {
   transition: background 0.15s;
 }
 
-#restart-btn:hover {
+.menu-btn:hover {
   background: var(--restart-hover);
+}
+
+.menu-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
 /* ---- Theme toggle ---- */

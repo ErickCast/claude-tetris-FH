@@ -52,10 +52,22 @@
     </div>
 
     <div id="overlay" class="overlay hidden">
-      <div class="overlay-box">
-        <p id="overlay-title">GAME OVER</p>
+      <div id="screen-start" class="screen hidden">
+        <p class="screen-title">TETRIS</p>
+        <div id="records-slot"></div>
+        <div id="skin-slot"></div>
+        <button id="play-btn" class="menu-btn">JUGAR</button>
+      </div>
+
+      <div id="screen-pause" class="screen hidden">
+        <p class="screen-title">PAUSA</p>
+      </div>
+
+      <div id="screen-gameover" class="screen hidden">
+        <p id="overlay-title" class="screen-title">GAME OVER</p>
         <p id="overlay-score"></p>
-        <button id="restart-btn">Reiniciar</button>
+        <div id="records-slot-gameover"></div>
+        <button id="restart-btn" class="menu-btn">Reiniciar</button>
       </div>
     </div>
   </div>

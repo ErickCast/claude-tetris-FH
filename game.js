@@ -30,6 +30,33 @@ const LINE_SCORES = [0, 100, 300, 500, 800];
 
 const GRID_COLORS = { dark: '#22222e', light: '#dcdce6' };
 
+// Keys reserved up front so the parallel features (pause menu, high scores,
+// skin selector) never collide on localStorage key names.
+const STORAGE_KEYS = {
+  theme: 'tetris.theme',
+  records: 'tetris.records',
+  skin: 'tetris.skin',
+  startLevel: 'tetris.startLevel',
+};
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw === null ? fallback : JSON.parse(raw);
+  } catch {
+    // localStorage can throw (e.g. file://); the game must stay playable without persistence
+    return fallback;
+  }
+}
+
+function saveJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore — persistence is best-effort
+  }
+}
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -38,12 +65,31 @@ const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
 const overlay = document.getElementById('overlay');
-const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const playBtn = document.getElementById('play-btn');
 const themeSwitch = document.getElementById('theme-switch');
 
+const SCREENS = {
+  start: document.getElementById('screen-start'),
+  pause: document.getElementById('screen-pause'),
+  gameover: document.getElementById('screen-gameover'),
+};
+
+function hideScreens() {
+  Object.values(SCREENS).forEach(el => el.classList.add('hidden'));
+  overlay.classList.add('hidden');
+}
+
+function showScreen(name) {
+  hideScreens();
+  overlay.classList.remove('hidden');
+  SCREENS[name].classList.remove('hidden');
+}
+
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, theme;
+let combo, maxCombo, inputLocked;
+let startLevel = loadJSON(STORAGE_KEYS.startLevel, 1);
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -113,6 +159,7 @@ function clearLines() {
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
     updateHUD();
   }
+  return cleared > 0;
 }
 
 function ghostY() {
@@ -140,7 +187,13 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
+  const clearedAny = clearLines();
+  if (clearedAny) {
+    combo++;
+    maxCombo = Math.max(maxCombo, combo);
+  } else {
+    combo = 0;
+  }
   spawn();
 }
 
@@ -225,27 +278,26 @@ function drawNext() {
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
-  overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
-  overlay.classList.remove('hidden');
+  showScreen('gameover');
 }
 
 function setTheme(newTheme) {
   theme = newTheme;
   document.body.classList.toggle('light-theme', theme === 'light');
+  saveJSON(STORAGE_KEYS.theme, theme);
 }
 
 function togglePause() {
   if (gameOver) return;
   paused = !paused;
   if (!paused) {
+    hideScreens();
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlay.classList.remove('hidden');
+    showScreen('pause');
   }
 }
 
@@ -271,28 +323,47 @@ function loop(ts) {
   animId = requestAnimationFrame(loop);
 }
 
-function init() {
+function startGame() {
   // kill any pending frame before rebuilding state, so a restart never leaves two loops running
   cancelAnimationFrame(animId);
   animId = null;
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  level = startLevel;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  combo = 0;
+  maxCombo = 0;
+  inputLocked = false;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
-  overlay.classList.add('hidden');
+  hideScreens();
   animId = requestAnimationFrame(loop);
 }
 
+function init() {
+  // no active run until the player presses JUGAR
+  cancelAnimationFrame(animId);
+  animId = null;
+  paused = false;
+  gameOver = true;
+  inputLocked = false;
+  combo = 0;
+  maxCombo = 0;
+  const savedTheme = loadJSON(STORAGE_KEYS.theme, 'dark');
+  setTheme(savedTheme);
+  themeSwitch.checked = savedTheme === 'light';
+  showScreen('start');
+}
+
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  if (inputLocked) return;
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -316,11 +387,11 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
+playBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
 
 themeSwitch.addEventListener('change', () => {
   setTheme(themeSwitch.checked ? 'light' : 'dark');
 });
 
-setTheme('dark');
 init();
