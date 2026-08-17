@@ -227,6 +227,50 @@ kbd {
   width: 100%;
 }
 
+/* ---- Skin selector ---- */
+.skin-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.skin-selector-label {
+  text-align: center;
+}
+
+.skin-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.skin-btn {
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.skin-btn:hover {
+  border-color: var(--value-color);
+}
+
+.skin-btn.active {
+  background: var(--restart-bg);
+  color: var(--restart-text);
+  border-color: var(--restart-bg);
+}
+
 /* ---- Theme toggle ---- */
 .theme-toggle {
   position: fixed;

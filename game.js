@@ -30,6 +30,99 @@ const LINE_SCORES = [0, 100, 300, 500, 800];
 
 const GRID_COLORS = { dark: '#22222e', light: '#dcdce6' };
 
+// Each skin owns its own palette AND its own block painter. drawBlock()
+// delegates to SKINS[skin].paintBlock rather than reading COLORS directly,
+// so adding a skin never touches the board/piece/color-index identity rule.
+const SKINS = {
+  retro: {
+    label: 'Retro',
+    palette: COLORS,
+    gridColor: null, // falls back to GRID_COLORS[theme]
+    background: null, // falls back to the CSS --board-bg variable
+    paintBlock(context, x, y, colorIndex, size, alpha) {
+      const color = this.palette[colorIndex];
+      context.globalAlpha = alpha ?? 1;
+      context.fillStyle = color;
+      context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+      // highlight
+      context.fillStyle = 'rgba(255,255,255,0.12)';
+      context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+      context.globalAlpha = 1;
+    },
+  },
+  neon: {
+    label: 'Neón',
+    palette: [null, '#00e5ff', '#fff176', '#e040fb', '#69f0ae', '#ff5252', '#448aff', '#ffab40'],
+    gridColor: 'rgba(0, 229, 255, 0.15)',
+    background: '#000000',
+    paintBlock(context, x, y, colorIndex, size, alpha) {
+      const color = this.palette[colorIndex];
+      context.globalAlpha = alpha ?? 1;
+      context.shadowBlur = 8;
+      context.shadowColor = color;
+      context.fillStyle = color;
+      context.fillRect(x * size + 3, y * size + 3, size - 6, size - 6);
+      // reset sticky shadow state immediately so it never bleeds into
+      // whatever is drawn next (grid lines, ghost, other skins/frames)
+      context.shadowBlur = 0;
+      context.shadowColor = 'transparent';
+      context.globalAlpha = 1;
+    },
+  },
+  pastel: {
+    label: 'Pastel',
+    palette: [null, '#a8d8ea', '#fff3b0', '#d9c2ec', '#b5e8b0', '#f7b2b7', '#b8c9f0', '#ffd6a5'],
+    gridColor: null,
+    background: null,
+    paintBlock(context, x, y, colorIndex, size, alpha) {
+      const color = this.palette[colorIndex];
+      const px = x * size + 2, py = y * size + 2, w = size - 4, h = size - 4;
+      const r = Math.min(6, w / 2, h / 2);
+      context.globalAlpha = alpha ?? 1;
+      context.beginPath();
+      if (context.roundRect) {
+        context.roundRect(px, py, w, h, r);
+      } else {
+        context.moveTo(px + r, py);
+        context.arcTo(px + w, py, px + w, py + h, r);
+        context.arcTo(px + w, py + h, px, py + h, r);
+        context.arcTo(px, py + h, px, py, r);
+        context.arcTo(px, py, px + w, py, r);
+        context.closePath();
+      }
+      context.fillStyle = color;
+      context.fill();
+      // soft top highlight
+      context.fillStyle = 'rgba(255,255,255,0.35)';
+      context.fillRect(px, py, w, Math.max(2, h * 0.3));
+      context.globalAlpha = 1;
+    },
+  },
+  pixel: {
+    label: 'Pixel',
+    palette: COLORS,
+    gridColor: null,
+    background: null,
+    paintBlock(context, x, y, colorIndex, size, alpha) {
+      const color = this.palette[colorIndex];
+      const px = x * size + 1, py = y * size + 1, w = size - 2, h = size - 2;
+      context.globalAlpha = alpha ?? 1;
+      context.fillStyle = color;
+      context.fillRect(px, py, w, h);
+      // coarse dither/texture: a 2x2 checkerboard of two opposite quadrants,
+      // cheap enough to redraw on every cell every frame at 60fps
+      context.fillStyle = 'rgba(0,0,0,0.18)';
+      const half = size / 2;
+      context.fillRect(px, py, half - 1, half - 1);
+      context.fillRect(px + half, py + half, half - 1, half - 1);
+      context.strokeStyle = 'rgba(0,0,0,0.4)';
+      context.lineWidth = 1;
+      context.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1);
+      context.globalAlpha = 1;
+    },
+  },
+};
+
 // Keys reserved up front so the parallel features (pause menu, high scores,
 // skin selector) never collide on localStorage key names.
 const STORAGE_KEYS = {
@@ -69,6 +162,7 @@ const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const playBtn = document.getElementById('play-btn');
 const themeSwitch = document.getElementById('theme-switch');
+const skinSlot = document.getElementById('skin-slot');
 
 const pauseMainView = document.getElementById('pause-main-view');
 const pauseControlsView = document.getElementById('pause-controls-view');
@@ -101,6 +195,7 @@ function showScreen(name) {
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, theme;
 let combo, maxCombo, inputLocked;
 let startLevel = loadJSON(STORAGE_KEYS.startLevel, 1);
+let skin = 'retro';
 
 // Pause menu sub-state: which view is shown ('main' | 'controls') and which
 // item is keyboard-highlighted within the main view's item list.
@@ -237,18 +332,11 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
-  context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  context.globalAlpha = 1;
+  SKINS[skin].paintBlock(context, x, y, colorIndex, size, alpha);
 }
 
 function drawGrid() {
-  ctx.strokeStyle = GRID_COLORS[theme];
+  ctx.strokeStyle = SKINS[skin].gridColor || GRID_COLORS[theme];
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -451,6 +539,60 @@ function setTheme(newTheme) {
   saveJSON(STORAGE_KEYS.theme, theme);
 }
 
+// Skins are independent from the light/dark theme: switching one never touches the other.
+function applySkinBoardBackground() {
+  const bg = SKINS[skin].background;
+  canvas.style.backgroundColor = bg || '';
+  nextCanvas.style.backgroundColor = bg || '';
+}
+
+function updateSkinSelectorUI() {
+  skinSlot.querySelectorAll('.skin-btn').forEach(btn => {
+    const isActive = btn.dataset.skin === skin;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+}
+
+function applySkin(newSkin) {
+  if (!SKINS[newSkin]) return;
+  skin = newSkin;
+  saveJSON(STORAGE_KEYS.skin, skin);
+  applySkinBoardBackground();
+  updateSkinSelectorUI();
+  // redraw immediately with the new skin, no reload needed
+  if (board) draw();
+  if (next) drawNext();
+}
+
+function renderSkinSelector() {
+  skinSlot.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'skin-selector';
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'label skin-selector-label';
+  labelEl.textContent = 'SKIN';
+  wrap.appendChild(labelEl);
+
+  const options = document.createElement('div');
+  options.className = 'skin-options';
+  Object.keys(SKINS).forEach(key => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'skin-btn';
+    btn.dataset.skin = key;
+    btn.textContent = SKINS[key].label;
+    btn.setAttribute('aria-pressed', key === skin ? 'true' : 'false');
+    if (key === skin) btn.classList.add('active');
+    btn.addEventListener('click', () => applySkin(key));
+    options.appendChild(btn);
+  });
+  wrap.appendChild(options);
+
+  skinSlot.appendChild(wrap);
+}
+
 function togglePause() {
   if (gameOver) return;
   paused = !paused;
@@ -609,6 +751,10 @@ function init() {
   const savedTheme = loadJSON(STORAGE_KEYS.theme, 'dark');
   setTheme(savedTheme);
   themeSwitch.checked = savedTheme === 'light';
+  const savedSkin = loadJSON(STORAGE_KEYS.skin, 'retro');
+  skin = SKINS[savedSkin] ? savedSkin : 'retro';
+  applySkinBoardBackground();
+  renderSkinSelector();
   showScreen('start');
   renderRecordsAll();
 }
