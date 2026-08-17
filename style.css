@@ -272,3 +272,110 @@ kbd {
 .switch input:checked + .slider::before {
   transform: translateX(20px);
 }
+
+/* ---- Records (tabla de puntuaciones locales) ---- */
+.records-aggregates {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--label-color);
+  font-weight: 600;
+}
+
+.records-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--label-color);
+  margin-top: 4px;
+}
+
+.records-empty {
+  font-size: 12px;
+  color: var(--control-text);
+}
+
+.records-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 220px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+}
+
+.records-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.records-row--new {
+  background: var(--value-color);
+  color: var(--restart-text);
+  font-weight: 700;
+}
+
+.records-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.records-score {
+  font-weight: 700;
+}
+
+.records-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.records-entry-label {
+  font-size: 12px;
+  color: var(--label-color);
+}
+
+.records-entry-input {
+  width: 100%;
+  max-width: 200px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--board-border);
+  background: var(--board-bg);
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+
+.records-save-btn {
+  padding: 8px 20px;
+}
+
+.records-reset-btn {
+  margin-top: 4px;
+  background: transparent;
+  border: 1px solid var(--board-border);
+  color: var(--control-text);
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-size: 11px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.records-reset-btn:hover {
+  border-color: var(--overlay-title-color);
+  color: var(--overlay-title-color);
+}
