@@ -61,6 +61,42 @@
 
       <div id="screen-pause" class="screen hidden">
         <p class="screen-title">PAUSA</p>
+
+        <div id="pause-main-view" class="pause-subview">
+          <ul class="menu-list" id="pause-main-menu">
+            <li class="pause-item" data-item="resume">
+              <button type="button" class="menu-btn pause-btn" id="pause-resume-btn">Reanudar</button>
+            </li>
+            <li class="pause-item" data-item="restart">
+              <button type="button" class="menu-btn pause-btn" id="pause-restart-btn">Reiniciar</button>
+            </li>
+            <li class="pause-item" data-item="controls">
+              <button type="button" class="menu-btn pause-btn" id="pause-controls-btn">Ver controles</button>
+            </li>
+            <li class="pause-item" data-item="level">
+              <div class="level-picker">
+                <span class="pause-item-label">Nivel inicial</span>
+                <div class="level-stepper">
+                  <button type="button" class="stepper-btn" id="pause-level-dec" aria-label="Disminuir nivel inicial">−</button>
+                  <span class="level-value" id="pause-level-value">1</span>
+                  <button type="button" class="stepper-btn" id="pause-level-inc" aria-label="Aumentar nivel inicial">+</button>
+                </div>
+              </div>
+              <span class="pause-item-hint">Se aplica en la próxima partida</span>
+            </li>
+          </ul>
+        </div>
+
+        <div id="pause-controls-view" class="pause-subview hidden">
+          <ul class="controls-list">
+            <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+            <li><kbd>↑</kbd><kbd>X</kbd> rotar</li>
+            <li><kbd>↓</kbd> bajar</li>
+            <li><kbd>Space</kbd> caída</li>
+            <li><kbd>P</kbd> / <kbd>Esc</kbd> pausa</li>
+          </ul>
+          <button type="button" class="menu-btn pause-btn" id="pause-controls-back-btn">Volver</button>
+        </div>
       </div>
 
       <div id="screen-gameover" class="screen hidden">

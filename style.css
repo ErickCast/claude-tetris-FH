@@ -272,3 +272,111 @@ kbd {
 .switch input:checked + .slider::before {
   transform: translateX(20px);
 }
+
+/* ---- Pause menu ---- */
+.pause-subview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.pause-subview.hidden {
+  display: none;
+}
+
+.pause-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-radius: 8px;
+  padding: 4px;
+  transition: background 0.15s;
+}
+
+.pause-item.focused {
+  background: rgba(122, 162, 247, 0.12);
+}
+
+.pause-item .pause-btn {
+  width: 100%;
+}
+
+.pause-item.focused .pause-btn {
+  outline: 2px solid var(--value-color);
+  outline-offset: 2px;
+}
+
+.pause-item-label {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--control-text);
+}
+
+.pause-item-hint {
+  font-size: 10px;
+  color: var(--label-color);
+}
+
+.level-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.level-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepper-btn {
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
+  color: var(--text);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.stepper-btn:hover {
+  background: var(--restart-hover);
+  color: var(--restart-text);
+}
+
+.level-value {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--value-color);
+  min-width: 20px;
+  text-align: center;
+}
+
+.pause-item.focused .level-value {
+  text-decoration: underline;
+}
+
+.controls-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.controls-list li {
+  font-size: 13px;
+  color: var(--control-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}

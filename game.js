@@ -70,6 +70,17 @@ const restartBtn = document.getElementById('restart-btn');
 const playBtn = document.getElementById('play-btn');
 const themeSwitch = document.getElementById('theme-switch');
 
+const pauseMainView = document.getElementById('pause-main-view');
+const pauseControlsView = document.getElementById('pause-controls-view');
+const pauseMenuItems = Array.from(document.querySelectorAll('#pause-main-menu .pause-item'));
+const pauseLevelValueEl = document.getElementById('pause-level-value');
+const pauseResumeBtn = document.getElementById('pause-resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const pauseControlsBtn = document.getElementById('pause-controls-btn');
+const pauseLevelDecBtn = document.getElementById('pause-level-dec');
+const pauseLevelIncBtn = document.getElementById('pause-level-inc');
+const pauseControlsBackBtn = document.getElementById('pause-controls-back-btn');
+
 const SCREENS = {
   start: document.getElementById('screen-start'),
   pause: document.getElementById('screen-pause'),
@@ -90,6 +101,11 @@ function showScreen(name) {
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, theme;
 let combo, maxCombo, inputLocked;
 let startLevel = loadJSON(STORAGE_KEYS.startLevel, 1);
+
+// Pause menu sub-state: which view is shown ('main' | 'controls') and which
+// item is keyboard-highlighted within the main view's item list.
+let pauseView = 'main';
+let pauseMenuIndex = 0;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -297,7 +313,90 @@ function togglePause() {
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
+    openPauseMenu();
     showScreen('pause');
+  }
+}
+
+// Resets the pause menu to its main view and first item every time it opens,
+// so it never reopens deep inside "Ver controles" from a previous pause.
+function openPauseMenu() {
+  pauseView = 'main';
+  pauseMenuIndex = 0;
+  renderPauseMenu();
+}
+
+function renderPauseMenu() {
+  const inMain = pauseView === 'main';
+  pauseMainView.classList.toggle('hidden', !inMain);
+  pauseControlsView.classList.toggle('hidden', inMain);
+  pauseMenuItems.forEach((el, i) => {
+    el.classList.toggle('focused', inMain && i === pauseMenuIndex);
+  });
+  pauseLevelValueEl.textContent = startLevel;
+}
+
+function adjustStartLevel(delta) {
+  startLevel = Math.min(10, Math.max(1, startLevel + delta));
+  saveJSON(STORAGE_KEYS.startLevel, startLevel);
+  renderPauseMenu();
+}
+
+function closePauseControls() {
+  pauseView = 'main';
+  renderPauseMenu();
+}
+
+function activatePauseMainItem(item) {
+  switch (item) {
+    case 'resume':
+      togglePause();
+      break;
+    case 'restart':
+      startGame();
+      break;
+    case 'controls':
+      pauseView = 'controls';
+      renderPauseMenu();
+      break;
+    // 'level' has no Enter/Space action; it is adjusted with ArrowLeft/ArrowRight.
+  }
+}
+
+// Routes keydown events while the pause menu is open, instead of the normal
+// in-game controls. Called from the main keydown listener when `paused` is true.
+function handlePauseMenuKey(e) {
+  if (pauseView === 'controls') {
+    if (e.code === 'Enter' || e.code === 'Space' || e.code === 'Backspace') {
+      e.preventDefault();
+      closePauseControls();
+    }
+    return;
+  }
+  switch (e.code) {
+    case 'ArrowUp':
+      e.preventDefault();
+      pauseMenuIndex = (pauseMenuIndex - 1 + pauseMenuItems.length) % pauseMenuItems.length;
+      renderPauseMenu();
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      pauseMenuIndex = (pauseMenuIndex + 1) % pauseMenuItems.length;
+      renderPauseMenu();
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      if (pauseMenuItems[pauseMenuIndex].dataset.item === 'level') adjustStartLevel(-1);
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      if (pauseMenuItems[pauseMenuIndex].dataset.item === 'level') adjustStartLevel(1);
+      break;
+    case 'Enter':
+    case 'Space':
+      e.preventDefault();
+      activatePauseMainItem(pauseMenuItems[pauseMenuIndex].dataset.item);
+      break;
   }
 }
 
@@ -362,9 +461,16 @@ function init() {
 }
 
 document.addEventListener('keydown', e => {
+  // P/Escape must always be able to close the pause menu, regardless of which
+  // sub-view is showing — routed first so the player can never get trapped.
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (inputLocked) return;
+    togglePause();
+    return;
+  }
   if (inputLocked) return;
-  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
-  if (paused || gameOver) return;
+  if (paused) { handlePauseMenuKey(e); return; }
+  if (gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -389,6 +495,26 @@ document.addEventListener('keydown', e => {
 
 playBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
+
+// Each button also moves the keyboard highlight to its own item first, so
+// mouse and keyboard navigation stay in sync. Only one listener per click
+// target (the button itself, not its ancestor .pause-item) so nothing
+// double-fires on bubble.
+function focusPauseItem(item) {
+  const i = pauseMenuItems.findIndex(el => el.dataset.item === item);
+  if (i !== -1) pauseMenuIndex = i;
+}
+
+pauseResumeBtn.addEventListener('click', () => { focusPauseItem('resume'); togglePause(); });
+pauseRestartBtn.addEventListener('click', () => { focusPauseItem('restart'); startGame(); });
+pauseControlsBtn.addEventListener('click', () => {
+  focusPauseItem('controls');
+  pauseView = 'controls';
+  renderPauseMenu();
+});
+pauseControlsBackBtn.addEventListener('click', () => closePauseControls());
+pauseLevelDecBtn.addEventListener('click', () => { focusPauseItem('level'); adjustStartLevel(-1); });
+pauseLevelIncBtn.addEventListener('click', () => { focusPauseItem('level'); adjustStartLevel(1); });
 
 themeSwitch.addEventListener('change', () => {
   setTheme(themeSwitch.checked ? 'light' : 'dark');
