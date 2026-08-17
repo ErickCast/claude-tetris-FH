@@ -106,6 +106,12 @@ let startLevel = loadJSON(STORAGE_KEYS.startLevel, 1);
 // item is keyboard-highlighted within the main view's item list.
 let pauseView = 'main';
 let pauseMenuIndex = 0;
+// ---- Records (top-5 local high scores) ----
+let records = loadJSON(STORAGE_KEYS.records, []);
+records.sort((a, b) => b.score - a.score);
+let pendingEntry = null;   // { score, lines, maxCombo } awaiting a name after a qualifying run
+let highlightDate = null;  // date of the entry to highlight (the one just saved)
+let resetConfirming = false;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -291,11 +297,152 @@ function drawNext() {
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
 }
 
+function qualifiesForTopFive(candidateScore) {
+  if (candidateScore <= 0) return false;
+  if (records.length < 5) return true;
+  return candidateScore > records[records.length - 1].score;
+}
+
+function saveRecords(list) {
+  saveJSON(STORAGE_KEYS.records, list);
+}
+
+function saveRecordEntry(name) {
+  if (!pendingEntry) return;
+  const entry = {
+    name: (name || '').trim().slice(0, 12) || 'Jugador',
+    score: pendingEntry.score,
+    lines: pendingEntry.lines,
+    maxCombo: pendingEntry.maxCombo,
+    date: new Date().toISOString(),
+  };
+  records.push(entry);
+  records.sort((a, b) => b.score - a.score);
+  records = records.slice(0, 5);
+  saveRecords(records);
+  highlightDate = entry.date;
+  pendingEntry = null;
+  renderRecordsAll();
+}
+
+function resetRecords() {
+  records = [];
+  saveRecords(records);
+  highlightDate = null;
+  pendingEntry = null;
+  resetConfirming = false;
+  renderRecordsAll();
+}
+
+// Single rendering routine reused by both the start screen and the game-over
+// screen. `allowEntry` gates whether the name-entry form for a just-finished
+// qualifying run may appear in this particular container.
+function renderRecords(container, allowEntry) {
+  container.innerHTML = '';
+
+  const bestCombo = records.reduce((m, r) => Math.max(m, r.maxCombo || 0), 0);
+  const maxLines = records.reduce((m, r) => Math.max(m, r.lines || 0), 0);
+
+  const aggregates = document.createElement('div');
+  aggregates.className = 'records-aggregates';
+  const comboStat = document.createElement('span');
+  comboStat.textContent = `Mejor combo: ${bestCombo}`;
+  const linesStat = document.createElement('span');
+  linesStat.textContent = `Máx. líneas: ${maxLines}`;
+  aggregates.append(comboStat, linesStat);
+  container.appendChild(aggregates);
+
+  const title = document.createElement('p');
+  title.className = 'records-title';
+  title.textContent = 'RECORDS';
+  container.appendChild(title);
+
+  if (records.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'records-empty';
+    empty.textContent = 'Sin records todavía';
+    container.appendChild(empty);
+  } else {
+    const list = document.createElement('ol');
+    list.className = 'records-list';
+    records.forEach(rec => {
+      const li = document.createElement('li');
+      li.className = 'records-row';
+      if (highlightDate && rec.date === highlightDate) li.classList.add('records-row--new');
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'records-name';
+      nameSpan.textContent = rec.name;
+      const scoreSpan = document.createElement('span');
+      scoreSpan.className = 'records-score';
+      scoreSpan.textContent = rec.score.toLocaleString();
+      li.append(nameSpan, scoreSpan);
+      list.appendChild(li);
+    });
+    container.appendChild(list);
+  }
+
+  if (allowEntry && pendingEntry) {
+    const form = document.createElement('div');
+    form.className = 'records-entry';
+
+    const label = document.createElement('label');
+    label.className = 'records-entry-label';
+    label.textContent = '¡Nuevo record! Ingresa tu nombre:';
+    label.htmlFor = 'record-name-input';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'record-name-input';
+    input.maxLength = 12;
+    input.className = 'records-entry-input';
+    input.placeholder = 'Nombre';
+    input.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter') saveRecordEntry(input.value);
+    });
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'menu-btn records-save-btn';
+    saveBtn.textContent = 'Guardar';
+    saveBtn.addEventListener('click', () => saveRecordEntry(input.value));
+
+    form.append(label, input, saveBtn);
+    container.appendChild(form);
+    input.focus();
+  }
+
+  if (records.length > 0) {
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'records-reset-btn';
+    resetBtn.textContent = resetConfirming ? '¿Seguro? Confirmar' : 'Borrar records';
+    resetBtn.addEventListener('click', () => {
+      if (resetConfirming) {
+        resetRecords();
+      } else {
+        resetConfirming = true;
+        renderRecordsAll();
+      }
+    });
+    container.appendChild(resetBtn);
+  }
+}
+
+function renderRecordsAll() {
+  renderRecords(document.getElementById('records-slot'), false);
+  renderRecords(document.getElementById('records-slot-gameover'), true);
+}
+
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  pendingEntry = qualifiesForTopFive(score) ? { score, lines, maxCombo } : null;
+  highlightDate = null;
+  resetConfirming = false;
   showScreen('gameover');
+  renderRecordsAll();
 }
 
 function setTheme(newTheme) {
@@ -431,11 +578,16 @@ function startGame() {
   lines = 0;
   level = startLevel;
   dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  // A qualifying score left un-named (e.g. the player hit "Reiniciar" before
+  // saving) must not vanish silently — bank it under a default name.
+  if (pendingEntry) saveRecordEntry('');
   combo = 0;
   maxCombo = 0;
   inputLocked = false;
   paused = false;
   gameOver = false;
+  pendingEntry = null;
+  resetConfirming = false;
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
@@ -458,6 +610,7 @@ function init() {
   setTheme(savedTheme);
   themeSwitch.checked = savedTheme === 'light';
   showScreen('start');
+  renderRecordsAll();
 }
 
 document.addEventListener('keydown', e => {
